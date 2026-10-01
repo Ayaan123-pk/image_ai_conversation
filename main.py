@@ -1,41 +1,29 @@
+# ============================ PART 1 ============================
 from config import HF_API_KEY
 import requests, base64, os, re, time
 from PIL import Image
-from colorama import init, Fore,Style
+from colorama import init, Fore, Style
 
 init(autoreset=True)
 
 ROUTER_URL = "https://router.huggingface.co/v1/chat/completions"
-
 HEADERS = {"Authorization": f"Bearer {HF_API_KEY}", "Content-Type": "application/json"}
 
 VISION_MODELS = [
 
 "moonshotai/Kimi-K2.6:novita",
 
-"meta-llama/Llama-4-Maverick-17B-128E-Instruct:sambanova",
-
-"meta-llama/Llama-3.2-11B-Vision-Instruct:sambanova",
-
 ]
-
 TEXT_MODELS = [
-
-"Qwen/Qwen2.5-7B-Instruct:together",
-
-"Qwen/Qwen2.5-14B-Instruct:together",
-
-"Qwen/Qwen2.5-32B-Instruct:together",
-
-"mistralai/Mistral-7B-Instruct-v0.3:together",
-
-"mistralai/Mixtral-8x7B-Instruct-v0.1:together",
-
-"meta-llama/Llama-3-8B-Instruct",
-
-"MiniMaxAI/MiniMax-M1-80k",
-
+    "Qwen/Qwen2.5-7B-Instruct:together",
+    "Qwen/Qwen2.5-14B-Instruct:together",
+    "Qwen/Qwen2.5-32B-Instruct:together",
+    "mistralai/Mistral-7B-Instruct-v0.3:together",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1:together",
+    "meta-llama/Llama-3-8B-Instruct",
+    "MiniMaxAI/MiniMax-M1-80k",
 ]
+
 def _data_url(path: str) -> str:
     with open(path, "rb") as f:
         return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode("utf-8")
@@ -91,47 +79,59 @@ def _ensure_sentence_end(text: str) -> str:
 # - generate_text(...)
 # - generate_exact_sentence(...)
 
-
 def generate_text(prompt: str, max_new_tokens: int = 220) -> str:
-    raise Exception("Part 2 code not added")
+    txt, err = _run_models(TEXT_MODELS, [{"role": "user", "content": prompt}], max_tokens=max_new_tokens, temperature=0.4)
+    if not txt:
+        raise Exception(err)
+    return txt
 
 def generate_exact_sentence(prompt: str, n_words: int, max_new_tokens: int, tries: int = 6) -> str:
-    raise Exception("Part 2 code not added")
+    last = ""
+    for _ in range(tries):
+        last = generate_text(prompt, max_new_tokens=max_new_tokens)
+        if len(_words(last)) >= n_words:
+            return _ensure_sentence_end(_exact_n_words(last, n_words))
+        prompt += f"\n\nTry again. Ensure at least {n_words} words and end with a period."
+        time.sleep(0.2)
+    return _ensure_sentence_end(_exact_n_words(last, min(n_words, len(_words(last)))))
 
 
 # ============================ PART 2 (PASTE INTO PART 1) ============================
+
 def get_basic_caption(image_path: str) -> str:
-    print(f"{Fore.YELLOW}) Generating basic option...")
+    print(f"{Fore.YELLOW}🖼️ Generating basic caption ...")
     msgs = [{
-        "role":"user",
+        "role": "user",
         "content": [
-            {"type": "text","text": "Write one complete sentence describing this image."},
-            {"type": "image_url", "image_url": {"url" : _data_url(image_path)}},
+            {"type": "text", "text": "Write one complete sentence describing this image."},
+            {"type": "image_url", "image_url": {"url": _data_url(image_path)}},
         ],
     }]
-    cap,err = _run_models(VISION_MODELS, msgs, max_tokens=90, temperature=0.2)
+    cap, err = _run_models(VISION_MODELS, msgs, max_tokens=90, temperature=0.2)
     return cap if cap else f"[Error] {err}"
 
 def print_menu():
     print(f"""{Style.BRIGHT}{Fore.GREEN}
-    ========== Image-to-Text Conversation ==========
-    Select output type:
-    1. Caption
-    2. Description
-    3. Summary 
-    4.Exit
-======================================
+================ Image-to-Text Conversion =================
+Select output type:
+1. Caption (5 words)
+2. Description (30 words)
+3. Summary (50 words)
+4. Exit
+=============================================================
 """)
+
 def main():
-    image_path = input(f"{Fore.BLUE}Enter the path of the image(e.g., test.jpg):{Style.RESET_ALL}")
+    image_path = input(f"{Fore.BLUE}Enter the path of the image (e.g., test.jpg): {Style.RESET_ALL}")
     if not os.path.exists(image_path):
-        print(f"(Fore.RED)X The file '{image_path}' does not exist:")
+        print(f"{Fore.RED}❌ The file '{image_path}' does not exist.")
         return
     try:
         Image.open(image_path)
     except Exception as e:
-        print(f"{Fore.RED} Failed to open image: {e}")
+        print(f"{Fore.RED}❌ Failed to open image: {e}")
         return
+
     basic_caption = get_basic_caption(image_path)
     print(f"{Fore.YELLOW}📝 Basic caption: {Style.BRIGHT}{basic_caption}\n")
 
